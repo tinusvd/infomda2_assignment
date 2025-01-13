@@ -4,6 +4,12 @@ author: "Martijn van Dam, Jonathan Koop, Merlin Urbanski"
 format: html
 ---
 
+```{r}
+#| echo: false
+options(scipen = 999)
+```
+
+
 # 1. Preparations
 
 ## 1.1 Load Packages
@@ -11,7 +17,7 @@ format: html
 ```{r}
 library(pacman)
 
-p_load("readr", "tidyverse", "caret")
+p_load("readr", "tidyverse", "caret", "kableExtra")
 ```
 
 ## 1.2 Load Data
@@ -40,6 +46,8 @@ As can be seen from the output above, all variables except for `ID` are either n
 ```{r}
 data <- data %>%
   mutate(class = as.factor(class)) # change class to factor
+
+data$class <- as.factor(data$class)
 ```
 
 
@@ -61,7 +69,7 @@ sig_05 <- data %>%
   filter(V1 < 0.05)
 ```
 
-The code above performs t-tests for each variable in the data set and filters out the variables for which the $p$-value is below 0.05. When we run the code, we see that this approach does not effectively reduces the number of variables, as we still have `r nrow(simple_data)` variables left. This leads to an unidentifiable model, because we still have more variables than observations. For that reason, we reduce the threshold to 0.01.
+The code above performs t-tests for each variable in the data set and filters out the variables for which the $p$-value is below 0.05. When we run the code, we see that this approach does not effectively reduces the number of variables, as we still have `r nrow(sig_05)` variables left. This leads to an unidentifiable model, because we still have more variables than observations. For that reason, we reduce the threshold to 0.01.
 
 ```{r}
 sig_01 <- data %>%
@@ -105,5 +113,138 @@ set.seed(123)
 model_benchmark <- train(class ~ ., data = data_benchmark, method = "glm", family = "binomial", trControl = trainControl(method = "cv", number = 10))
 
 summary(model_benchmark)
+model_benchmark$results
+```
+
+Even though we have reduced the number of variables to `r nrow(sig_001)`, the algorithm still does not seem to converge. In the li
+
+## 3.3 7 Most Significant Variables
+
+```{r}
+sig_7 <- sig_001 %>%
+  top_n(7, V1) %>%
+  pull(variable)
+
+data_7 <- data %>%
+  select(sig_7, class) %>% 
+  train(class ~ ., data = ., method = "glm", family = "binomial", trControl = trainControl(method = "cv", number = 10))
+
+data_7$results
+```
+
+
+# 4. Principal Component Regression (High-Dimensional Approach)
+
+## 4.1 Principal Component Analysis
+
+### 4.1.1 Identify Principal Components
+
+```{r}
+pca <- data %>%
+  select(-ID, -class) %>%
+  prcomp(center = TRUE, scale. = TRUE)
+```
+
+### 4.1.2 Scree Plot
+
+```{r}
+screeplot(pca, type = "lines", main = "Scree Plot")
+```
+
+Analyzing the scree plot, we can see that the first component explains most of the variance in the data, explaining three times as much variance as the second component. The third component explains even less variance. This suggests that we can reduce the dimensionality of the data by only using the first component, as the elbow is already at the second component.
+
+### 4.1.3 Variances Explained
+
+Only seeing the absolute eigenvalue of the components does not give us a good idea of how much variance each component explains. Therefore, we calculate the proportion of variance explained by each component and the cumulative proportion of variance explained.
+
+```{r}
+pca_table <- tibble(
+  component = seq_along(pca$sdev),       # Component numbers
+  eigenvalue = pca$sdev^2                 # Variances (eigenvalues)
+) %>%
+  mutate(
+    proportion = eigenvalue / sum(eigenvalue),  # Proportion of variance explained
+    cumulative = cumsum(proportion)        # Cumulative variance explained
+  ) %>%
+  round(., 3)
+```
+
+As can be seen in the table below, the first component explains only `r pca_table$proportion[1]` of the variance. This implies that simply using the first component would not be a good idea, as it does not explain enough variance. We can see that even the first 10 components only explain `r pca_table$cumulative[10]` of the variance. This suggests that we should use more than just the first components. Therefore, the eigenvalue greater than 1 rule may perform better in this case.
+
+```{r}
+pca_table %>%
+  filter(eigenvalue > 1) %>%
+  kable("html") %>%
+  kable_styling("striped", full_width = F)
+```
+
+### 4.1.4 Eigenvalue Greater Than 1 Rule
+
+```{r}
+pc_greaterthan1 <- pca_table %>%
+  filter(eigenvalue > 1) %>%
+  pull(component) %>% 
+  paste0("pc", .)
+```
+
+## 4.2 Model Building
+
+### 4.2.1 Subset Data
+
+```{r}
+data_pca <- bind_cols(
+  class = data$class,  # Add class column
+  as_tibble(pca$x)     # Convert PCA matrix to tibble
+) %>%
+  set_names(c("class", paste0("pc", 1:ncol(pca$x)))) 
+```
+
+### 4.2.2 Scree Plot
+
+```{r}
+logit_scree <- data_pca %>%
+  select(pc1, class) %>%
+  train(
+    class ~ .,
+    data = .,
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 10)
+  )
+
+summary(logit_scree)
+logit_scree$results
+```
+
+### 4.2.3 Eigenvalue Greater Than 1 Rule
+
+```{r}
+logit_greaterthan1 <- data_pca %>% 
+  select(all_of(pc_greaterthan1), class) %>%
+  train(
+    class ~ .,
+    data = .,
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 10)
+  )
+
+summary(logit_greaterthan1)
+logit_greaterthan1$results
+```
+
+```{r}
+logit_7 <- data_pca %>% 
+  select(pc1, pc2, pc3, pc4, pc5, pc6, pc7, class) %>%
+  train(
+    class ~ .,
+    data = .,
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 10)
+  )
+
+summary(logit_7)
+logit_7$results
 ```
 

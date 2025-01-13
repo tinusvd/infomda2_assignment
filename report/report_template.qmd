@@ -1,0 +1,70 @@
+---
+title: "Group assignment: Is High-Dimensional Analysis Worth it?"
+format: 
+  pdf:
+    toc: false
+    number-sections: true
+    documentclass: article
+    geometry: "margin=4cm"
+    bibliography: bibliography.bib
+abstract: |
+    You can write the abstract at the end. Do it approximately like this and you have a nice flow: one sentence about data context. One sentence about research problem. One sentence about research question. One sentence about methods compared. One sentence about results. One sentence about conclusion.
+author: 
+  - Carlos Perengano
+  - Erika Mustermann
+  - Jan Kowalski
+---
+
+
+# Introduction
+
+::: {.callout-note}
+Max 700 words
+::: 
+
+Provide a description of your data and relevant context on the research problem it might have been designed to solve in 2 to 3 paragraphs. Maybe referring to a figure in a manner such as @fig-introimage.
+
+```{r}
+#| label: fig-introimage
+#| fig-cap: A boxplot comparing the mpg of cars for different numbers of cylinders.
+#| out-width: "80%"
+#| echo: false
+boxplot(mpg ~ cyl, data = mtcars)
+```
+
+Write max 2 paragraphs describing the research problem and leading to the methodological research question. The question should revolve around comparing high-dimensional vs not high-dimensional methods.
+
+
+# Methods
+
+::: {.callout-note}
+500-600 words
+::: 
+
+Description of methods you use in maximum 3 paragraphs. You might want to refer to literature which you can find in the file `bibliography.bib` e.g., @hastie2015statistical or @james2013introduction. Use bibtex notation in the `.bib` file.
+
+Also describe your comparison or validation strategy in 1 or 2 paragraphs. Answer the question: how are you going to compare your chosen methods against each other? How are you going to conclude which is better for this dataset / research purpose? 
+
+# Results
+
+::: {.callout-note}
+Max 500 words
+::: 
+
+Here, provide a description of __relevant__ results in 2 to 3 paragraphs. You are invited to use images / plots to help communicate your results, but keep this section legible and stick to the main points! In your results section, you should refrain from giving too much discussion / explanation; be quite factual.
+
+# Conclusion
+
+::: {.callout-note}
+Max 700 words
+::: 
+
+Start with a short summary of what you have done in 1 paragraph ("in this report, we have...").
+
+Then, write your conclusion in which you answer your research question in 1 paragraph ("For this dataset, we have found that the high-dimensional analysis improved / did not improve over ..." )
+
+Then, contextualize your conclusion by providing some discussion additional interpretation in approx. 3 paragraphs. Feel free to refer to additional literature if you like. Suggestions for future research might be nice to add.
+
+
+# References
+<!-- Don't put anything here, your references will be inserted automatically at the end -->

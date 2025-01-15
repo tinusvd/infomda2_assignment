@@ -116,7 +116,7 @@ summary(model_benchmark)
 model_benchmark$results
 ```
 
-Even though we have reduced the number of variables to `r nrow(sig_001)`, the algorithm still does not seem to converge. In the li
+Even though we have reduced the number of variables to `r nrow(sig_001)`, the algorithm still does not seem to converge. The issue here 
 
 ## 3.3 7 Most Significant Variables
 
@@ -233,18 +233,166 @@ summary(logit_greaterthan1)
 logit_greaterthan1$results
 ```
 
-```{r}
-logit_7 <- data_pca %>% 
-  select(pc1, pc2, pc3, pc4, pc5, pc6, pc7, class) %>%
-  train(
-    class ~ .,
-    data = .,
-    method = "glm",
-    family = "binomial",
-    trControl = trainControl(method = "cv", number = 10)
-  )
+### Iteratively Add Components
 
-summary(logit_7)
-logit_7$results
+```{r}
+logit_results <- rep(NA, length(pc_greaterthan1))
+
+for (i in 1:length(pc_greaterthan1)) {
+  logit <- data_pca %>% 
+    select(all_of(pc_greaterthan1[1:i]), class) %>%
+    train(
+      class ~ .,
+      data = .,
+      method = "glm",
+      family = "binomial",
+      trControl = trainControl(method = "LOOCV")
+    )
+  
+  logit_results[i] <- logit$results$Accuracy
+   
+}
+
+ggplot(data = data.frame(x = 1:length(pc_greaterthan1), y = logit_results), aes(x = x, y = y)) +
+  geom_line() +
+  labs(x = "Number of Components", y = "Accuracy", title = "Accuracy by Number of Components") +
+  theme_minimal()
+```
+
+Only keep components that increase accuracy
+
+
+```{r}
+diff <- c(0, diff(logit_results))
+
+index <- which(diff >= 0)
+```
+
+```{r}
+logit_results_incr <- rep(NA, length(index))
+
+for (i in seq_along(index)) {
+  logit <- data_pca %>% 
+    select(all_of(pc_greaterthan1[index[1:i]]), class) %>%
+    train(
+      class ~ .,
+      data = .,
+      method = "glm",
+      family = "binomial",
+      trControl = trainControl(method = "LOOCV")
+    )
+  
+  logit_results_incr[i] <- logit$results$Accuracy
+   
+}
+
+diff_incr <- c(0, diff(logit_results_incr))
+
+index_incr <- index[which(diff_incr >= 0)]
+
+logit_results_incr2 <- rep(NA, length(index_incr))
+
+for (i in seq_along(index_incr)) {
+  logit <- data_pca %>% 
+    select(all_of(pc_greaterthan1[index_incr[1:i]]), class) %>%
+    train(
+      class ~ .,
+      data = .,
+      method = "glm",
+      family = "binomial",
+      trControl = trainControl(method = "LOOCV")
+    )
+  
+  logit_results_incr2[i] <- logit$results$Accuracy
+   
+}
+
+diff_incr2 <- c(0, diff(logit_results_incr2))
+
+index_incr2 <- index_incr[which(diff_incr2 >= 0)]
+
+logit_results_incr3 <- rep(NA, length(index_incr2))
+
+for (i in seq_along(index_incr2)) {
+  logit <- data_pca %>% 
+    select(all_of(pc_greaterthan1[index_incr[1:i]]), class) %>%
+    train(
+      class ~ .,
+      data = .,
+      method = "glm",
+      family = "binomial",
+      trControl = trainControl(method = "LOOCV")
+    )
+  
+  logit_results_incr3[i] <- logit$results$Accuracy
+   
+}
+```
+
+```{r}
+iterations <- 10
+
+# Initialize index_incr for the first iteration
+index_incr <- index
+
+# Store results of each iteration
+logit_results_all <- list()
+diff_results_all <- list()
+
+for (iteration in 1:iterations) {
+  
+  logit_results <- rep(NA, length(index_incr))
+
+  for (i in seq_along(index_incr)) {
+    logit <- data_pca %>% 
+      select(all_of(pc_greaterthan1[index_incr[1:i]]), class) %>%
+      train(
+        class ~ .,
+        data = .,
+        method = "glm",
+        family = "binomial",
+        trControl = trainControl(method = "LOOCV")
+      )
+    
+    logit_results[i] <- logit$results$Accuracy
+  }
+
+  diff_results <- c(0, diff(logit_results))
+
+  # Save results of the current iteration
+  logit_results_all[[iteration]] <- logit_results
+  diff_results_all[[iteration]] <- diff_results
+
+  # Update index_incr for the next iteration
+  index_incr <- index_incr[which(diff_results >= 0)]
+
+  # Break the loop if no more indices are selected
+  if (length(index_incr) == 0) break
+}
+
+# Final result stored in logit_results_all and diff_results_all for all iterations
+
+```
+
+
+```{r}
+ggplot(data = data.frame(x = 1:length(index_incr), y = logit_results_all[[10]]), aes(x = x, y = y)) +
+  geom_line() +
+  labs(x = "Number of Components", y = "Accuracy", title = "Accuracy by Number of Components") +
+  theme_minimal()
+```
+
+```{r}
+logit <- data_pca %>% 
+      select(all_of(pc_greaterthan1[index_incr]), class) %>%
+      train(
+        class ~ .,
+        data = .,
+        method = "glm",
+        family = "binomial",
+        trControl = trainControl(method = "LOOCV")
+      )
+
+summary(logit)
 ```
 

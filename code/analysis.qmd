@@ -110,7 +110,7 @@ data_benchmark <- data %>%
 
 ```{r}
 set.seed(123)
-model_benchmark <- train(class ~ ., data = data_benchmark, method = "glm", family = "binomial", trControl = trainControl(method = "cv", number = 10))
+model_benchmark <- train(class ~ ., data = data_benchmark, method = "glm", family = "binomial", trControl = trainControl(method = "LOOCV"))
 
 summary(model_benchmark)
 model_benchmark$results
@@ -127,7 +127,7 @@ sig_7 <- sig_001 %>%
 
 data_7 <- data %>%
   select(sig_7, class) %>% 
-  train(class ~ ., data = ., method = "glm", family = "binomial", trControl = trainControl(method = "cv", number = 10))
+  train(class ~ ., data = ., method = "glm", family = "binomial", trControl = trainControl(method = "LOOCV"))
 
 data_7$results
 ```
@@ -209,7 +209,7 @@ logit_scree <- data_pca %>%
     data = .,
     method = "glm",
     family = "binomial",
-    trControl = trainControl(method = "cv", number = 10)
+    trControl = trainControl(method = "LOOCV")
   )
 
 summary(logit_scree)
@@ -226,7 +226,7 @@ logit_greaterthan1 <- data_pca %>%
     data = .,
     method = "glm",
     family = "binomial",
-    trControl = trainControl(method = "cv", number = 10)
+    trControl = trainControl(method = "LOOCV")
   )
 
 summary(logit_greaterthan1)
@@ -393,6 +393,6 @@ logit <- data_pca %>%
         trControl = trainControl(method = "LOOCV")
       )
 
-summary(logit)
+
 ```
 

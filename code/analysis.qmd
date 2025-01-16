@@ -2,6 +2,9 @@
 title: "INFOMDA2: Group Assignment"
 author: "Martijn van Dam, Jonathan Koop, Merlin Urbanski"
 format: html
+knitr:
+  opts_chunk: 
+    warning: false
 ---
 
 ```{r}
@@ -15,15 +18,21 @@ options(scipen = 999)
 ## 1.1 Load Packages
 
 ```{r}
+# if required, install pacman package
+if (!requireNamespace("pacman", quietly = TRUE)) {
+  install.packages("pacman")
+}
+
 library(pacman)
 
-p_load("readr", "tidyverse", "caret", "kableExtra")
+# load all packages with pacman
+p_load("readr", "tidyverse", "caret", "kableExtra", "pROC")
 ```
 
 ## 1.2 Load Data
 
 ```{r}
-data <- read.csv("../raw_data/data.csv")
+data <- read.csv("../raw_data/data.csv") # load data
 ```
 
 
@@ -32,21 +41,19 @@ data <- read.csv("../raw_data/data.csv")
 First, we can explore what the data looks like by looking at the first few rows of the data set.
 
 ```{r}
-head(data)
+head(data) # show first few rows of data
 ```
 
 We can also look at the structure of the data set to see what kind of variables we are dealing with.
 
 ```{r}
-str(data)
+str(data) # show structure of data
 ```
 
 As can be seen from the output above, all variables except for `ID` are either numeric or integers. Since we have a categorical outcome, we have to transform it to a factor
 
 ```{r}
-data <- data %>%
-  mutate(class = as.factor(class)) # change class to factor
-
+# Convert class to factor
 data$class <- as.factor(data$class)
 ```
 
@@ -62,11 +69,11 @@ First, we check which variables lead to a $p$-value below 0.05.
 ```{r}
 sig_05 <- data %>%
   select(-ID) %>% # remove ID column
-  summarise(across(-class, ~ t.test(.x ~ class)$p.value)) %>%
-  t() %>%
+  summarise(across(-class, ~ t.test(.x ~ class)$p.value)) %>% # perform t-tests
+  t() %>% # transpose
   as.data.frame() %>%
-  rownames_to_column("variable") %>%
-  filter(V1 < 0.05)
+  rownames_to_column("variable") %>% # add variable names as a column
+  filter(V1 < 0.05) # filter out variables with p-value < 0.05
 ```
 
 The code above performs t-tests for each variable in the data set and filters out the variables for which the $p$-value is below 0.05. When we run the code, we see that this approach does not effectively reduces the number of variables, as we still have `r nrow(sig_05)` variables left. This leads to an unidentifiable model, because we still have more variables than observations. For that reason, we reduce the threshold to 0.01.
@@ -78,7 +85,7 @@ sig_01 <- data %>%
   t() %>%
   as.data.frame() %>%
   rownames_to_column("variable") %>%
-  filter(V1 < 0.01)
+  filter(V1 < 0.01) # filter out variables with p-value < 0.01
 ```
 
 We still have too many significant variables. Consequently, we reduce the threshold further.
@@ -90,7 +97,7 @@ sig_001 <- data %>%
   t() %>%
   as.data.frame() %>%
   rownames_to_column("variable") %>%
-  filter(V1 < 0.001)
+  filter(V1 < 0.001) # filter out variables with p-value < 0.001
 ```
 
 
@@ -108,28 +115,35 @@ data_benchmark <- data %>%
 
 ### 3.2.2 Logistic Regression with Cross-Validation
 
-```{r}
-set.seed(123)
-model_benchmark <- train(class ~ ., data = data_benchmark, method = "glm", family = "binomial", trControl = trainControl(method = "LOOCV"))
+#### 3.2.2.1 Training the Model
 
-summary(model_benchmark)
-model_benchmark$results
+```{r}
+# | warning: false 
+
+set.seed(123) # set seed for reproducibility
+
+# Train logistic regression model
+model_benchmark <- train(
+  class ~ ., # all significant variables
+  data = data_benchmark,
+  method = "glm",
+  family = "binomial",
+  trControl = trainControl(method = "LOOCV", savePredictions = "final", classProbs = TRUE)) # leave-one-out cross-validation
+
+summary(model_benchmark) # show summary of model
 ```
 
-Even though we have reduced the number of variables to `r nrow(sig_001)`, the algorithm still does not seem to converge. The issue here 
+Even though we have reduced the number of variables to `r nrow(sig_001)`, the algorithm still does not seem to converge.
 
-## 3.3 7 Most Significant Variables
+#### 3.2.2.2 Making Predictions and Evaluating the Model
 
 ```{r}
-sig_7 <- sig_001 %>%
-  top_n(7, V1) %>%
-  pull(variable)
+# Accuracy and Kappa
+model_benchmark$results
 
-data_7 <- data %>%
-  select(sig_7, class) %>% 
-  train(class ~ ., data = ., method = "glm", family = "binomial", trControl = trainControl(method = "LOOCV"))
-
-data_7$results
+# ROC Curve and AUC
+predictions_model_benchmark <- model_benchmark$pred
+roc_benchmark <- roc(response = predictions_model_benchmark$obs, predictor = predictions_model_benchmark$P)
 ```
 
 
@@ -141,14 +155,14 @@ data_7$results
 
 ```{r}
 pca <- data %>%
-  select(-ID, -class) %>%
-  prcomp(center = TRUE, scale. = TRUE)
+  select(-ID, -class) %>% # remove ID and class columns
+  prcomp(center = TRUE, scale. = TRUE) # perform PCA
 ```
 
 ### 4.1.2 Scree Plot
 
 ```{r}
-screeplot(pca, type = "lines", main = "Scree Plot")
+screeplot(pca, type = "lines", main = "Scree Plot") # plot scree plot
 ```
 
 Analyzing the scree plot, we can see that the first component explains most of the variance in the data, explaining three times as much variance as the second component. The third component explains even less variance. This suggests that we can reduce the dimensionality of the data by only using the first component, as the elbow is already at the second component.
@@ -159,8 +173,8 @@ Only seeing the absolute eigenvalue of the components does not give us a good id
 
 ```{r}
 pca_table <- tibble(
-  component = seq_along(pca$sdev),       # Component numbers
-  eigenvalue = pca$sdev^2                 # Variances (eigenvalues)
+  component = seq_along(pca$sdev), # Component numbers
+  eigenvalue = pca$sdev^2 # Variances (eigenvalues)
 ) %>%
   mutate(
     proportion = eigenvalue / sum(eigenvalue),  # Proportion of variance explained
@@ -173,18 +187,18 @@ As can be seen in the table below, the first component explains only `r pca_tabl
 
 ```{r}
 pca_table %>%
-  filter(eigenvalue > 1) %>%
-  kable("html") %>%
-  kable_styling("striped", full_width = F)
+  filter(eigenvalue > 1) %>% # filter out components with eigenvalue > 1
+  kable("html") %>% # create HTML table
+  kable_styling("striped", full_width = F) # add styling
 ```
 
 ### 4.1.4 Eigenvalue Greater Than 1 Rule
 
 ```{r}
-pc_greaterthan1 <- pca_table %>%
-  filter(eigenvalue > 1) %>%
-  pull(component) %>% 
-  paste0("pc", .)
+pc_greaterthan1 <- pca_table %>% 
+  filter(eigenvalue > 1) %>% # filter out components with eigenvalue > 1
+  pull(component) %>% # extract component numbers
+  paste0("pc", .) # create column names
 ```
 
 ## 4.2 Model Building
@@ -196,203 +210,231 @@ data_pca <- bind_cols(
   class = data$class,  # Add class column
   as_tibble(pca$x)     # Convert PCA matrix to tibble
 ) %>%
-  set_names(c("class", paste0("pc", 1:ncol(pca$x)))) 
+  set_names(c("class", paste0("pc", 1:ncol(pca$x)))) # Rename columns
 ```
 
-### 4.2.2 Scree Plot
+### 4.2.2 Logistic Regression Using Elbow Criterion
+
+#### 4.2.2.1 Training the Model
 
 ```{r}
-logit_scree <- data_pca %>%
+model_scree <- data_pca %>%
   select(pc1, class) %>%
   train(
     class ~ .,
     data = .,
     method = "glm",
     family = "binomial",
-    trControl = trainControl(method = "LOOCV")
+    trControl = trainControl(method = "LOOCV", savePredictions = "final", classProbs = TRUE) # leave-one-out cross-validation
   )
 
-summary(logit_scree)
-logit_scree$results
+summary(model_scree) # show summary of model
 ```
 
-### 4.2.3 Eigenvalue Greater Than 1 Rule
+#### 4.2.2.2 Making Predictions and Evaluating the Model
 
 ```{r}
-logit_greaterthan1 <- data_pca %>% 
+# Accuracy and Kappa
+model_scree$results
+
+# ROC Curve and AUC
+predictions_model_scree <- model_scree$pred
+roc_scree<- roc(response = predictions_model_scree$obs, predictor = predictions_model_scree$P)
+```
+
+### 4.2.3 Logistic Regression Using Eigenvalue Greater Than 1 Rule
+
+#### 4.2.3.1 Training the Model
+
+```{r}
+model_greaterthan1 <- data_pca %>% 
   select(all_of(pc_greaterthan1), class) %>%
   train(
     class ~ .,
     data = .,
     method = "glm",
     family = "binomial",
-    trControl = trainControl(method = "LOOCV")
+    trControl = trainControl(method = "LOOCV", savePredictions = "final", classProbs = TRUE)
   )
 
-summary(logit_greaterthan1)
-logit_greaterthan1$results
+summary(model_greaterthan1)
 ```
 
-### Iteratively Add Components
+#### 4.2.3.2 Making Predictions and Evaluating the Model
 
 ```{r}
-logit_results <- rep(NA, length(pc_greaterthan1))
+# Accuracy and Kappa
+model_greaterthan1$results
 
-for (i in 1:length(pc_greaterthan1)) {
-  logit <- data_pca %>% 
-    select(all_of(pc_greaterthan1[1:i]), class) %>%
-    train(
-      class ~ .,
-      data = .,
-      method = "glm",
-      family = "binomial",
-      trControl = trainControl(method = "LOOCV")
-    )
-  
-  logit_results[i] <- logit$results$Accuracy
-   
-}
-
-ggplot(data = data.frame(x = 1:length(pc_greaterthan1), y = logit_results), aes(x = x, y = y)) +
-  geom_line() +
-  labs(x = "Number of Components", y = "Accuracy", title = "Accuracy by Number of Components") +
-  theme_minimal()
+# ROC Curve and AUC
+predictions_model_greaterthan1 <- model_greaterthan1$pred
+roc_greaterthan1 <- roc(response = predictions_model_greaterthan1$obs, predictor = predictions_model_greaterthan1$P)
 ```
 
-Only keep components that increase accuracy
+# 5. Plots
 
+## 5.1 Scree Plot
 
 ```{r}
-diff <- c(0, diff(logit_results))
+# Slice out the first 90 components
+pca_table_90 <- pca_table %>% 
+  slice(1:90)
 
-index <- which(diff >= 0)
+
+ggplot(pca_table_90, aes(x = component)) +
+  # Bar plot for variance explained
+  geom_col(aes(y = eigenvalue), fill = "steelblue") +
+  
+  # Line + points for cumulative explained variance, scaled to max(eigenvalue)
+  geom_line(aes(y = cumulative * max(eigenvalue)), color = "red", size = 1) +
+  geom_point(aes(y = cumulative * max(eigenvalue)), color = "red", size = 2) +
+  
+  # Set up x-axis breaks (optional, e.g. every 5 components)
+  scale_x_continuous(breaks = seq(0, 90, by = 5)) +
+  
+  # Primary y-axis is variance; secondary y-axis is the cumulative proportion
+  scale_y_continuous(
+    name = "Variance (Eigenvalue)",
+    sec.axis = sec_axis(
+      trans = ~ . / max(pca_table_90$eigenvalue),
+      name = "Cumulative Proportion of Variance Explained"
+    )
+  ) +
+  
+  # Labels and title
+  labs(
+    title = "Scree Plot For Principal Components",
+    x = "Principal Component"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, face = "italic"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold")
+  )
+
+ggsave("../plots/scree_plot.png", width = 12, height = 8)
 ```
 
+## 5.2 ROC Curves
+
 ```{r}
-logit_results_incr <- rep(NA, length(index))
+ggroc(list(
+  benchmark = roc_benchmark,
+  scree = roc_scree,
+  greaterthan1 = roc_greaterthan1
+)) +
+  labs(
+    title = "ROC Curves of Different Models",
+    x = "1 - Specificity (False Positive Rate)",
+    y = "Sensitivity (True Positive Rate)",
+    color = "Model"
+  ) +
+  geom_abline(
+    intercept = 1,
+    slope = 1,
+    linetype = "dashed",
+    color = "gray",
+    size = 0.8
+  ) +
+  scale_color_manual(
+    values = c("steelblue", "orange", "darkgreen"),
+    labels = c("Benchmark", "Scree", "Greater Than 1")
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, face = "italic"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold")
+  )
 
-for (i in seq_along(index)) {
-  logit <- data_pca %>% 
-    select(all_of(pc_greaterthan1[index[1:i]]), class) %>%
-    train(
-      class ~ .,
-      data = .,
-      method = "glm",
-      family = "binomial",
-      trControl = trainControl(method = "LOOCV")
-    )
-  
-  logit_results_incr[i] <- logit$results$Accuracy
-   
-}
-
-diff_incr <- c(0, diff(logit_results_incr))
-
-index_incr <- index[which(diff_incr >= 0)]
-
-logit_results_incr2 <- rep(NA, length(index_incr))
-
-for (i in seq_along(index_incr)) {
-  logit <- data_pca %>% 
-    select(all_of(pc_greaterthan1[index_incr[1:i]]), class) %>%
-    train(
-      class ~ .,
-      data = .,
-      method = "glm",
-      family = "binomial",
-      trControl = trainControl(method = "LOOCV")
-    )
-  
-  logit_results_incr2[i] <- logit$results$Accuracy
-   
-}
-
-diff_incr2 <- c(0, diff(logit_results_incr2))
-
-index_incr2 <- index_incr[which(diff_incr2 >= 0)]
-
-logit_results_incr3 <- rep(NA, length(index_incr2))
-
-for (i in seq_along(index_incr2)) {
-  logit <- data_pca %>% 
-    select(all_of(pc_greaterthan1[index_incr[1:i]]), class) %>%
-    train(
-      class ~ .,
-      data = .,
-      method = "glm",
-      family = "binomial",
-      trControl = trainControl(method = "LOOCV")
-    )
-  
-  logit_results_incr3[i] <- logit$results$Accuracy
-   
-}
+ggsave("../plots/roc_curves.png", width = 12, height = 8)
 ```
 
+
+# 6. Iteratively Add Components
+
+## 6.1 Estimate Logistic Regression Models
+
 ```{r}
-iterations <- 10
+logit_results <- rep(NA, length(pc_greaterthan1)) # to store results
+logit_warnings <- rep(FALSE, length(pc_greaterthan1)) # to track warnings
 
-# Initialize index_incr for the first iteration
-index_incr <- index
-
-# Store results of each iteration
-logit_results_all <- list()
-diff_results_all <- list()
-
-for (iteration in 1:iterations) {
+for (i in seq_along(pc_greaterthan1)) {
+  captured_warning <- NULL # set caputured_warning to NULL
+  logit <- suppressWarnings(
+    withCallingHandlers({
+      # Fit logistic regression model
+      logit <- data_pca %>%
+        select(all_of(pc_greaterthan1[1:i]), class) %>%
+        train(
+          class ~ .,
+          data = .,
+          method = "glm",
+          family = "binomial",
+          trControl = trainControl(method = "LOOCV", savePredictions = "final", classProbs = TRUE)
+        )
+      # Store accuracy
+      logit_results[i] <- logit$results$Accuracy
+    }, warning = function(w) {
+      captured_warning <<- w # Capture the warning
+    })
+  )
   
-  logit_results <- rep(NA, length(index_incr))
-
-  for (i in seq_along(index_incr)) {
-    logit <- data_pca %>% 
-      select(all_of(pc_greaterthan1[index_incr[1:i]]), class) %>%
-      train(
-        class ~ .,
-        data = .,
-        method = "glm",
-        family = "binomial",
-        trControl = trainControl(method = "LOOCV")
-      )
-    
-    logit_results[i] <- logit$results$Accuracy
+  # logit_warnings == T if warning occurred
+  if (!is.null(captured_warning)) {
+    logit_warnings[i] <- TRUE
+    message(paste("Warning in iteration", i, ":", conditionMessage(captured_warning)))
   }
-
-  diff_results <- c(0, diff(logit_results))
-
-  # Save results of the current iteration
-  logit_results_all[[iteration]] <- logit_results
-  diff_results_all[[iteration]] <- diff_results
-
-  # Update index_incr for the next iteration
-  index_incr <- index_incr[which(diff_results >= 0)]
-
-  # Break the loop if no more indices are selected
-  if (length(index_incr) == 0) break
 }
-
-# Final result stored in logit_results_all and diff_results_all for all iterations
-
 ```
 
+## 6.2 Plot Accuracy by Number of Components
 
 ```{r}
-ggplot(data = data.frame(x = 1:length(index_incr), y = logit_results_all[[10]]), aes(x = x, y = y)) +
-  geom_line() +
-  labs(x = "Number of Components", y = "Accuracy", title = "Accuracy by Number of Components") +
-  theme_minimal()
-```
+# Create a data frame to combine all data
+plot_data <- data.frame(
+  x = 1:length(pc_greaterthan1),
+  y = logit_results,
+  warning = ifelse(logit_warnings, "No", "Yes") # Create a factor for warnings
+)
 
-```{r}
-logit <- data_pca %>% 
-      select(all_of(pc_greaterthan1[index_incr]), class) %>%
-      train(
-        class ~ .,
-        data = .,
-        method = "glm",
-        family = "binomial",
-        trControl = trainControl(method = "LOOCV")
-      )
+ggplot() +
+  # Line for accuracy results
+  geom_line(data = plot_data, aes(x = x, y = y)) +
+  
+  # Points with color mapped to 'warning'
+  geom_point(
+    data = plot_data,
+    aes(x = x, y = y, color = warning), size = 3
+  ) +
+  
+  labs(
+    x = "Number of Components",
+    y = "Accuracy",
+    title = "Accuracy by Number of Principal Components",
+    color = "Convergence" # Label for the legend
+  ) +
+  scale_color_manual(values = c("No" = "darkblue", "Yes" = "darkorange")) + # Custom colors
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, face = "italic"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold")
+  )
 
-
+ggsave("../plots/accuracy_by_components.png", width = 12, height = 8)
 ```
 

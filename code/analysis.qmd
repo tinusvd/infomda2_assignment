@@ -143,7 +143,7 @@ model_benchmark$results
 
 # ROC Curve and AUC
 predictions_model_benchmark <- model_benchmark$pred
-roc_benchmark <- roc(response = predictions_model_benchmark$obs, predictor = predictions_model_benchmark$P)
+(roc_benchmark <- roc(response = predictions_model_benchmark$obs, predictor = predictions_model_benchmark$P))
 ```
 
 
@@ -239,7 +239,7 @@ model_scree$results
 
 # ROC Curve and AUC
 predictions_model_scree <- model_scree$pred
-roc_scree<- roc(response = predictions_model_scree$obs, predictor = predictions_model_scree$P)
+(roc_scree<- roc(response = predictions_model_scree$obs, predictor = predictions_model_scree$P))
 ```
 
 ### 4.2.3 Logistic Regression Using Eigenvalue Greater Than 1 Rule
@@ -268,7 +268,7 @@ model_greaterthan1$results
 
 # ROC Curve and AUC
 predictions_model_greaterthan1 <- model_greaterthan1$pred
-roc_greaterthan1 <- roc(response = predictions_model_greaterthan1$obs, predictor = predictions_model_greaterthan1$P)
+(roc_greaterthan1 <- roc(response = predictions_model_greaterthan1$obs, predictor = predictions_model_greaterthan1$P))
 ```
 
 # 5. Plots

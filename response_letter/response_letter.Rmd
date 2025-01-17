@@ -1,0 +1,28 @@
+---
+title: 'Group assignment: response to peer reviews'
+author: "Jonathan Koop, Martijn van Dam, Merlin Urbanski"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Dear Reviewers,
+
+Thank you for your detailed and thoughtful feedback. Below is a brief summary of your main points and an overview of how we have addressed them in our revised report:
+
+You recommended that we refine the structure of our report by shortening and professionalizing section titles and introducing subsections in the Methods section to improve clarity. We have implemented these suggestions, made the titles more concise and adding distinct subheadings, which now makes the report more coherent and better to read.
+
+In the Introduction, you requested additional details on the dataset itself—such as whether the variables are numerical or categorical, their ranges, and what constitutes “high” or “low” values. We have expanded this section now, and provide examples and descriptive statistics to give readers a better sense of how the data are organized and what types of values are considered high or low.
+
+You also suggested elaborating on the methods used by Cilia et al. (2022), particularly regarding the classifiers they employed. Although we initially considered comparing our PCA approach to theirs, we opted not to do so in order state a research problem within our word limit and the scope of the course. Instead, we have highlighted the rationale for using PCA as a dimensionality-reduction technique and clarified our benchmark approach, backed by relevant literature references.
+
+Lastly, you emphasized the importance of evaluating sensitivity and specificity in the context of diagnosing Alzheimer’s disease. In response, we have now included an ROC curve in our report, which offers a more comprehensive view of these metrics and ensures a balanced assessment of our model’s diagnostic performance.
+
+We appreciate your constructive input and thank you for your effort in reviewing our report.
+
+Sincerely,
+
+Jonathan, Martijn and Merlin
